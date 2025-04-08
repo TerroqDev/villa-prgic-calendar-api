@@ -1,22 +1,45 @@
-use axum::{routing, Json, Router};
+use axum::{extract::Path, routing, Extension, Json, Router};
 use icalendar::{Calendar, CalendarComponent, Component};
 use reqwest::{get, StatusCode};
 use serde::Serialize;
-use tower_http::cors::{CorsLayer, Any};
+use shuttle_runtime::SecretStore;
+use tower::ServiceBuilder;
+use tower_http::cors::{Any, CorsLayer};
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
-#[derive(Serialize, Debug)]
+mod middleware;
+
+#[derive(Serialize, Debug, ToSchema)]
 struct ReservedDates {
     start_date: String,
     end_date: String,
 }
 
-async fn get_apartment_ics() -> (StatusCode, Json<Vec<ReservedDates>>) {
+#[derive(OpenApi)]
+#[openapi(paths(get_apartment_ics), components(schemas(ReservedDates)))]
+struct ApiDoc;
+
+#[utoipa::path(
+    get,
+    path = "/get_dates/{id}",
+    params(
+        ("id" = u8, Path, description = "Apartment ID")
+    ),
+    responses(
+        (status = 200, description = "Reserved dates", body = [ReservedDates])
+    )
+)]
+async fn get_apartment_ics(
+    Path(id): Path<u8>,
+    Extension(secret): Extension<SecretStore>,
+) -> (StatusCode, Json<Vec<ReservedDates>>) {
+    let apartment = format!("AIRBNB-A{}", id).to_string();
+    println!("{apartment:?}");
+    let sec = secret.get(&apartment).unwrap();
+    println!("{sec:?}");
     let mut dates: Vec<ReservedDates> = Vec::new();
-    let response = get("")
-        .await
-        .unwrap()
-        .text()
-        .await;
+    let response = get(sec).await.unwrap().text().await;
 
     let parsed_calendar: Calendar = response.unwrap().parse().unwrap();
 
@@ -31,21 +54,21 @@ async fn get_apartment_ics() -> (StatusCode, Json<Vec<ReservedDates>>) {
     (StatusCode::OK, Json(dates))
 }
 
-#[tokio::main]
-async fn main() {
+#[shuttle_runtime::main]
+async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum::ShuttleAxum {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .init();
     let app = Router::new()
-        .route("/", routing::get(|| async { "Hello world" }))
-        .route("/get_dates", routing::get(get_apartment_ics))
-        .layer(cors);
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::info!("Starting up server on port 3000");
-    axum::serve(listener, app).await.unwrap();
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .route("/get_dates/{id}", routing::get(get_apartment_ics))
+        .layer(
+            ServiceBuilder::new()
+                .layer(Extension(secrets))
+                .layer(cors)
+                .layer(axum::middleware::from_fn(middleware::api_key_auth)),
+        );
+    Ok(app.into())
 }

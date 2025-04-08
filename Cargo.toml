@@ -10,7 +10,12 @@ icalendar = "0.16.13"
 reqwest = "0.12.15"
 serde = {version = "1.0.219", features = ["derive"]}
 serde_json = "1.0.140"
+shuttle-axum = "0.53.0"
+shuttle-runtime = "0.53.0"
 tokio = {version = "1.44.1", features = ["full"]}
+tower = "0.5.2"
 tower-http = {version = "0.6.2", features = ["cors"]}
 tracing = "0.1.41"
 tracing-subscriber = "0.3"
+utoipa = "5.3.1"
+utoipa-swagger-ui = {version = "9.0.1", features = ["axum"]}
