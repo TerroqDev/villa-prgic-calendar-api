@@ -35,9 +35,7 @@ async fn get_apartment_ics(
     Extension(secret): Extension<SecretStore>,
 ) -> (StatusCode, Json<Vec<ReservedDates>>) {
     let apartment = format!("AIRBNB-A{}", id).to_string();
-    println!("{apartment:?}");
     let sec = secret.get(&apartment).unwrap();
-    println!("{sec:?}");
     let mut dates: Vec<ReservedDates> = Vec::new();
     let response = get(sec).await.unwrap().text().await;
 
