@@ -12,7 +12,7 @@ struct ReservedDates {
 
 async fn get_apartment_ics() -> (StatusCode, Json<Vec<ReservedDates>>) {
     let mut dates: Vec<ReservedDates> = Vec::new();
-    let response = get("https://www.airbnb.com/calendar/ical/819570085784640178.ics?s=52e6735d7bb44c1b6b8750562c78dcae")
+    let response = get("")
         .await
         .unwrap()
         .text()
